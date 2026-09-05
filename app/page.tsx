@@ -206,7 +206,7 @@ export default function Home() {
               <p className="card-label">GROWTH OPPORTUNITIES</p>
 
               <ul>
-                {analysis.gaps.map((gap, index) => (
+                {analysis.skillGaps.map((gap, index) => (
                <li key={index}>{gap}</li>
                ))}
               </ul>
