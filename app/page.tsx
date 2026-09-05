@@ -8,7 +8,7 @@ type AnalysisResult = {
   careerReadiness: number;
   summary: string;
   strengths: string[];
-  gaps: string[];
+  skillGaps: string[];
   recommendedPath: string[];
 };
 
@@ -207,8 +207,8 @@ export default function Home() {
 
               <ul>
                 {analysis.skillGaps.map((gap, index) => (
-               <li key={index}>{gap}</li>
-               ))}
+                  <li key={index}>{gap}</li>
+                ))}
               </ul>
             </div>
           </div>
