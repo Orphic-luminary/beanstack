@@ -1,60 +1,88 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 
-const ai = new OpenAI({
+const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
 });
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { name, role, skills } = body;
+    const { name, email, role, skills } = body;
 
-    const response = await ai.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+    const completion = await groq.chat.completions.create({
+      model: "openai/gpt-oss-120b",
       messages: [
         {
           role: "system",
-          content:
-            "You are a career analyst. Analyze candidates and return useful career insights.",
+          content: `
+You are BeanStack's AI career analyst.
+
+Analyze the user's career profile and return ONLY valid JSON.
+Do not use markdown or code fences.
+
+Return exactly this structure:
+
+{
+  "score": number,
+  "summary": "string",
+  "strengths": ["string", "string", "string"],
+  "gaps": ["string", "string", "string"]
+}
+          `,
         },
         {
           role: "user",
-          content: `Analyze this candidate:
-
+          content: `
 Name: ${name}
-Desired role: ${role}
+Email: ${email}
+Desired Role: ${role}
 Skills: ${skills}
 
-Return ONLY valid JSON in exactly this format:
-
-{
-  "careerReadiness": 75,
-  "summary": "A short analysis",
-  "strengths": ["strength 1", "strength 2", "strength 3"],
-  "skillGaps": ["gap 1", "gap 2", "gap 3"],
-  "recommendedPath": ["step 1", "step 2", "step 3"]
-}`,
+Analyze this person's career readiness.
+          `,
         },
       ],
+      temperature: 0.7,
+      max_completion_tokens: 1000,
     });
 
-    const text = response.choices[0]?.message?.content;
+    const content =
+      completion.choices[0]?.message?.content;
 
-    if (!text) {
-      throw new Error("AI returned no response");
+    if (!content) {
+      return NextResponse.json(
+        { error: "The AI returned no response" },
+        { status: 500 }
+      );
     }
 
-    const result = JSON.parse(text);
+    const analysis = JSON.parse(content);
 
-    return NextResponse.json(result);
+    const safeAnalysis = {
+        careerReadiness: analysis.careerReadiness ?? 0,
+        summary: analysis.summary ?? "No summary available.",
+        strengths: Array.isArray(analysis.strengths) ? analysis.strengths : [],
+        skillGaps: Array.isArray(analysis.skillGaps)
+        ? analysis.skillGaps
+        : [],
+        recommendedPath: Array.isArray(analysis.recommendedPath)
+        ? analysis.recommendedPath
+        : [],
+    };
+
+    return NextResponse.json(analysis);
   } catch (error) {
-    console.error(error);
+    console.error("GROQ ERROR:", error);
 
     return NextResponse.json(
-      { error: "Failed to analyze profile" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to analyze profile",
+      },
       { status: 500 }
     );
   }

@@ -4,35 +4,81 @@ import { FormEvent, useRef, useState } from "react";
 
 type Stage = "form" | "processing" | "result";
 
+type AnalysisResult = {
+  careerReadiness: number;
+  summary: string;
+  strengths: string[];
+  gaps: string[];
+  recommendedPath: string[];
+};
+
 export default function Home() {
   const [stage, setStage] = useState<Stage>("form");
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
   const [skills, setSkills] = useState("");
+
   const [resumeName, setResumeName] = useState("");
   const [dragging, setDragging] = useState(false);
+
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [error, setError] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFile(file: File | undefined) {
     if (!file) return;
+
     setResumeName(file.name);
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
+    setError("");
     setStage("processing");
 
-    // Fake AI processing for demo
-    setTimeout(() => {
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          name,
+          role,
+          skills,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Something went wrong");
+      }
+
+      setAnalysis(data);
+
       setStage("result");
-    }, 3500);
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        "We couldn't analyze your profile. Please check your connection and try again."
+      );
+
+      setStage("form");
+    }
   }
 
   function reset() {
     setStage("form");
+    setAnalysis(null);
+    setError("");
   }
 
   if (stage === "processing") {
@@ -52,7 +98,7 @@ export default function Home() {
           <h1>Analyzing your potential</h1>
 
           <p>
-            We&apos;re studying your skills, experience and career direction.
+            We're studying your skills, experience and career direction.
           </p>
 
           <div className="analysis-steps">
@@ -60,12 +106,14 @@ export default function Home() {
               <span className="step-dot active"></span>
               Reading your profile
             </div>
+
             <div>
               <span className="step-dot active"></span>
-              Analyzing your resume
+              Analyzing your skills
             </div>
+
             <div>
-              <span className="step-dot"></span>
+              <span className="step-dot active"></span>
               Building your learning path
             </div>
           </div>
@@ -74,7 +122,7 @@ export default function Home() {
     );
   }
 
-  if (stage === "result") {
+  if (stage === "result" && analysis) {
     return (
       <main className="result-page">
         <nav className="navbar">
@@ -94,13 +142,13 @@ export default function Home() {
             <p className="eyebrow">YOUR PROFILE ANALYSIS IS READY</p>
 
             <h1>
-              You&apos;re closer than you think,
+              You're closer than you think,
               <br />
               <span>{name || "future builder"}.</span>
             </h1>
 
             <p className="result-subtitle">
-              Here&apos;s what we discovered about your current profile.
+              Here's what we discovered about your current profile.
             </p>
           </div>
 
@@ -109,17 +157,21 @@ export default function Home() {
               <p>CAREER READINESS</p>
 
               <div className="score">
-                <span>78</span>
+                <span>{analysis.careerReadiness}</span>
                 <small>/100</small>
               </div>
 
               <div className="progress">
-                <div className="progress-fill"></div>
+                <div
+                  className="progress-fill"
+                  style={{
+                    width: `${analysis.careerReadiness}%`,
+                  }}
+                ></div>
               </div>
 
               <p className="score-description">
-                You have a strong foundation. A few focused improvements could
-                significantly increase your opportunities.
+                {analysis.summary}
               </p>
             </div>
 
@@ -127,15 +179,11 @@ export default function Home() {
               <p className="card-label">PROFILE SUMMARY</p>
 
               <h2>
-                Strong potential with
-                <span> room to specialize.</span>
+                Your personalized
+                <span> career analysis.</span>
               </h2>
 
-              <p>
-                Your current profile shows a solid foundation. Based on your
-                skills and chosen career direction, we identified a few areas
-                where focused learning could make the biggest difference.
-              </p>
+              <p>{analysis.summary}</p>
             </div>
           </div>
 
@@ -146,9 +194,9 @@ export default function Home() {
               <p className="card-label">YOUR STRENGTHS</p>
 
               <ul>
-                <li>Strong foundational skills</li>
-                <li>Clear career direction</li>
-                <li>Good potential for growth</li>
+                {analysis.strengths.map((strength, index) => (
+                  <li key={index}>{strength}</li>
+                ))}
               </ul>
             </div>
 
@@ -158,23 +206,24 @@ export default function Home() {
               <p className="card-label">GROWTH OPPORTUNITIES</p>
 
               <ul>
-                <li>Build more practical projects</li>
-                <li>Develop industry-specific skills</li>
-                <li>Strengthen your portfolio</li>
+                {analysis.gaps.map((gap, index) => (
+               <li key={index}>{gap}</li>
+               ))}
               </ul>
             </div>
           </div>
 
           <section className="next-step">
             <div>
-              <p className="eyebrow">WHAT&apos;S NEXT?</p>
+              <p className="eyebrow">YOUR RECOMMENDED PATH</p>
 
               <h2>Your personalized path starts here.</h2>
 
-              <p>
-                BeanStack can now help you build a learning journey based on
-                where you are and where you want to go.
-              </p>
+              <ol>
+                {analysis.recommendedPath?.map((step, index) => (
+                  <li key={index}>{step}</li>
+                ))}
+              </ol>
             </div>
 
             <button>
@@ -218,10 +267,12 @@ export default function Home() {
               <span>01</span>
               Share your profile
             </div>
+
             <div>
               <span>02</span>
               Get AI insights
             </div>
+
             <div>
               <span>03</span>
               Find your path
@@ -232,11 +283,23 @@ export default function Home() {
         <form className="profile-form" onSubmit={handleSubmit}>
           <div className="form-header">
             <p>STEP 01</p>
-            <h2>Let&apos;s start with you.</h2>
+            <h2>Let's start with you.</h2>
           </div>
+
+          {error && (
+            <p
+              style={{
+                color: "#ff6b6b",
+                marginBottom: "16px",
+              }}
+            >
+              {error}
+            </p>
+          )}
 
           <div className="input-group">
             <label>Your name</label>
+
             <input
               type="text"
               placeholder="Enter your full name"
@@ -248,6 +311,7 @@ export default function Home() {
 
           <div className="input-group">
             <label>Email address</label>
+
             <input
               type="email"
               placeholder="you@example.com"
@@ -259,6 +323,7 @@ export default function Home() {
 
           <div className="input-group">
             <label>What role are you aiming for?</label>
+
             <input
               type="text"
               placeholder="e.g. Frontend Developer, Data Analyst..."
@@ -270,6 +335,7 @@ export default function Home() {
 
           <div className="input-group">
             <label>Your key skills</label>
+
             <input
               type="text"
               placeholder="e.g. JavaScript, Python, Design..."
@@ -306,13 +372,17 @@ export default function Home() {
               {resumeName ? (
                 <>
                   <div className="file-icon">✓</div>
+
                   <strong>{resumeName}</strong>
+
                   <span>Resume selected successfully</span>
                 </>
               ) : (
                 <>
                   <div className="upload-icon">↑</div>
+
                   <strong>Drop your resume here</strong>
+
                   <span>or click to browse · PDF, DOC or DOCX</span>
                 </>
               )}
