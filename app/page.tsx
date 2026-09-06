@@ -21,6 +21,7 @@ export default function Home() {
   const [skills, setSkills] = useState("");
 
   const [resumeName, setResumeName] = useState("");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
 
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -29,57 +30,52 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFile(file: File | undefined) {
-    if (!file) return;
+  if (!file) return;
 
-    setResumeName(file.name);
-  }
+  setResumeFile(file);
+  setResumeName(file.name);
+}
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-
-    setError("");
+    if (!resumeFile) {
+      alert("Please upload your resume.");
+      return;
+    }
     setStage("processing");
-
     try {
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("email", email);
+      formData.append("role", role);
+      formData.append("skills", skills);
+      // Send the ACTUAL resume
+      formData.append("resume", resumeFile);
       const response = await fetch("/api/analyze", {
         method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          name,
-          role,
-          skills,
-        }),
+        body: formData,
       });
-
       const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || "Something went wrong");
+        throw new Error(data.error || "Failed to analyze profile");
       }
-
       setAnalysis(data);
-
       setStage("result");
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        "We couldn't analyze your profile. Please check your connection and try again."
+    } catch (error) {
+      console.error(error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong"
       );
-
       setStage("form");
     }
   }
-
-  function reset() {
-    setStage("form");
-    setAnalysis(null);
-    setError("");
-  }
+    function reset() {
+      setStage("form");
+      setAnalysis(null);
+      setError("");
+    }
 
   if (stage === "processing") {
     return (
@@ -364,7 +360,7 @@ export default function Home() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.docx"
                 onChange={(e) => handleFile(e.target.files?.[0])}
                 hidden
               />
