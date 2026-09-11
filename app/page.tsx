@@ -2,7 +2,22 @@
 
 import { FormEvent, useRef, useState } from "react";
 
-type Stage = "form" | "processing" | "result";
+type Stage = "form" | "processing" | "result" | "learning";
+
+type LearningPhase = {
+  title: string;
+  duration: string;
+  description: string;
+  skills: string[];
+  tasks: string[];
+  project: string;
+};
+
+type LearningPath = {
+  goal: string;
+  estimatedDuration: string;
+  phases: LearningPhase[];
+};
 
 type AnalysisResult = {
   careerReadiness: number;
@@ -13,6 +28,9 @@ type AnalysisResult = {
 };
 
 export default function Home() {
+  const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
+  const [learningLoading, setLearningLoading] = useState(false);
+
   const [stage, setStage] = useState<Stage>("form");
 
   const [name, setName] = useState("");
@@ -35,6 +53,59 @@ export default function Home() {
   setResumeFile(file);
   setResumeName(file.name);
 }
+
+  async function buildLearningPath() {
+    if (!analysis) return;
+
+    setLearningLoading(true);
+
+    try {
+      const response = await fetch("/api/learning-path", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          role,
+          skills,
+
+          careerReadiness:
+            analysis.careerReadiness,
+
+          summary:
+            analysis.summary,
+
+          strengths:
+            analysis.strengths,
+
+          skillGaps:
+            analysis.skillGaps,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to build learning path"
+        );
+      }
+
+      setLearningPath(data);
+      setStage("learning");
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to build learning path"
+      );
+    } finally {
+      setLearningLoading(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -114,6 +185,141 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </main>
+    );
+  }
+
+  if (stage === "learning" && learningPath) {
+    return (
+      <main className="learning-page">
+        <nav className="navbar">
+          <div className="brand">
+            bean<span>stack</span>
+          </div>
+
+          <button
+            className="nav-button"
+            onClick={() => setStage("result")}
+          >
+            ← Back to analysis
+          </button>
+        </nav>
+
+        <section className="learning-container">
+          {/* HEADER */}
+          <div className="learning-header">
+            <p className="eyebrow">
+              YOUR PERSONALIZED LEARNING PATH
+            </p>
+
+            <h1>
+              Your roadmap to becoming a{" "}
+              <span>{role}</span>.
+            </h1>
+
+            <p className="learning-subtitle">
+              {learningPath.goal}
+            </p>
+
+            <div className="duration">
+              <span>ESTIMATED JOURNEY</span>
+
+              <strong>
+                {learningPath.estimatedDuration}
+              </strong>
+            </div>
+          </div>
+
+          {/* ROADMAP */}
+          <div className="roadmap">
+            {learningPath.phases?.map((phase, index) => (
+              <article
+                className="phase-card"
+                key={index}
+              >
+                {/* PHASE NUMBER */}
+                <div className="phase-number">
+                  {String(index + 1).padStart(2, "0")}
+                </div>
+
+                <div className="phase-content">
+
+                  {/* PHASE TITLE */}
+                  <div className="phase-top">
+                    <div>
+                      <p className="card-label">
+                        PHASE {index + 1}
+                      </p>
+
+                      <h2>
+                        {phase.title}
+                      </h2>
+                    </div>
+
+                    <span className="phase-duration">
+                      {phase.duration}
+                    </span>
+                  </div>
+
+                  {/* DESCRIPTION */}
+                  <p className="phase-description">
+                    {phase.description}
+                  </p>
+
+                  {/* SKILLS */}
+                  <div className="phase-section">
+                    <p className="card-label">
+                      SKILLS TO DEVELOP
+                    </p>
+
+                    <div className="skill-tags">
+                      {phase.skills?.map(
+                        (skill, skillIndex) => (
+                          <span key={skillIndex}>
+                            {skill}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* TASKS */}
+                  <div className="phase-section">
+                    <p className="card-label">
+                      WHAT YOU&apos;LL DO
+                    </p>
+
+                    <ol className="task-list">
+                      {phase.tasks?.map(
+                        (task, taskIndex) => (
+                          <li key={taskIndex}>
+                            <span>
+                              {taskIndex + 1}
+                            </span>
+
+                            {task}
+                          </li>
+                        )
+                      )}
+                    </ol>
+                  </div>
+
+                  {/* PROJECT */}
+                  <div className="project-box">
+                    <p className="card-label">
+                      BUILD THIS PROJECT
+                    </p>
+
+                    <strong>
+                      {phase.project}
+                    </strong>
+                  </div>
+
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       </main>
     );
   }
@@ -222,8 +428,14 @@ export default function Home() {
               </ol>
             </div>
 
-            <button>
-              Build my learning path
+            <button
+              onClick={buildLearningPath}
+              disabled={learningLoading}
+            >
+              {learningLoading
+                ? "Building your path..."
+                : "Build my learning path"}
+
               <span>→</span>
             </button>
           </section>
