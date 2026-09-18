@@ -22,6 +22,17 @@ type LearningPath = {
 type AnalysisResult = {
   careerReadiness: number;
   summary: string;
+  profileAnalysis: string;
+
+  scores: {
+    skills: number;
+    experience: number;
+    projects: number;
+    roleAlignment: number;
+    education: number;
+    certifications: number;
+  };
+
   strengths: string[];
   skillGaps: string[];
   recommendedPath: string[];
